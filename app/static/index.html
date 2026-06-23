@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>英语单词查背一体</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>📖 英语单词查背一体</h1>
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="translate">翻译</button>
+            <button class="tab-btn" data-tab="vocab">单词本 <span id="vocabCount"></span></button>
+        </nav>
+    </header>
+
+    <main>
+        <section id="translate-tab" class="tab-panel active">
+            <form id="translateForm">
+                <textarea
+                    id="sentenceInput"
+                    placeholder="粘贴或输入一句英文…（最多 1000 字符）"
+                    maxlength="1000"
+                    required
+                ></textarea>
+                <div class="row">
+                    <button type="submit" id="translateBtn">翻译并分析</button>
+                    <button type="button" id="clearBtn">清空</button>
+                </div>
+            </form>
+
+            <div id="status" class="status" hidden>
+                <span class="spinner"></span>
+                <span id="statusText">分析中…</span>
+            </div>
+
+            <div id="error" class="error" hidden></div>
+
+            <div id="result" hidden>
+                <div class="card translation-card">
+                    <h3>原句</h3>
+                    <p id="sentenceRendered" class="sentence"></p>
+                    <h3>翻译</h3>
+                    <p id="translationText" class="translation"></p>
+                    <p class="hint">💡 提示：点击原句中任意单词查询；高亮词是 AI 推荐重点。</p>
+                </div>
+
+                <h3 class="section-title">关键词</h3>
+                <div id="keyWords" class="key-words"></div>
+            </div>
+
+            <div id="popover" class="popover" hidden></div>
+        </section>
+
+        <section id="vocab-tab" class="tab-panel">
+            <div class="vocab-controls">
+                <input
+                    type="search"
+                    id="vocabSearch"
+                    placeholder="搜索单词 / 释义…"
+                    maxlength="100"
+                >
+                <span id="vocabTotal" class="hint"></span>
+            </div>
+            <div id="vocabList" class="vocab-list"></div>
+            <div id="vocabPager" class="pager" hidden>
+                <button id="prevPage">← 上一页</button>
+                <span id="pageInfo"></span>
+                <button id="nextPage">下一页 →</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
