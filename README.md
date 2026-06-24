@@ -93,6 +93,14 @@ ruff format .
 
 Tests use a per-test temporary SQLite DB and mock `app.routers.translate.translate_sentence` / `lookup_word`. No network calls.
 
+## Key design decisions
+
+- **google-genai SDK + Pydantic `response_schema`** — the SDK validates the JSON shape, so there's no fragile manual parsing
+- **No ORM** — CRUD is simple, so stdlib `sqlite3` is enough; `UNIQUE(word, pos)` handles dedup
+- **Tokenization in the backend, not the LLM** — splitting a sentence into clickable tokens is deterministic, so it's a regex, not an LLM call
+- **Front-end lookup cache** — re-clicking the same word reuses the cached result instead of calling the API again
+- **Python 3.11** — matches the local environment
+
 ## License
 
 MIT
