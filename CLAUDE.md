@@ -57,6 +57,14 @@ ruff format .
 ### Frontend (`app/static/`)
 纯 HTML/CSS/JS，无构建步骤。双 tab：翻译 / 单词本。翻译结果中原句以可点击 token 渲染，AI 推荐词高亮；点击未高亮词触发 lookup popover。
 
+#### 视觉设计：黑板笔记本主题
+`style.css` 是"黑板 + 彩色粉笔"视觉体系，围绕"英语学习笔记本"这个主题设计，刻意避开常见的"暖白+衬线+赭石"或"近黑+单一荧光色"AI 模板化配色：
+
+- **配色**（`:root` 变量）：深板绿 `--board`/`--panel` 做底，粉笔白 `--chalk` 做正文，四种"粉笔色"各司其职——黄 `--chalk-yellow`（AI 推荐词高亮 / 激活态）、蓝 `--chalk-blue`（交互 / 焦点）、粉 `--chalk-pink`（危险操作）、绿 `--chalk-green`（成功态）
+- **字体**：标题、tab 名、"关键词"等分区标签用 Google Fonts 的 `Schoolbell`（手写粉笔体，需联网加载，走 CDN `<link>`，不影响离线运行本身）；正文保持系统 sans 栈（中文场景需要）；词性/难度标签等"字典注释"用等宽字体
+- **签名元素**：原句中 AI 推荐词的下划线用内联 SVG data-URI 画成手绘波浪线，按 `nth-of-type` 在黄/蓝/粉三色间轮换，模拟老师用不同颜色粉笔逐词标注；单词卡片轻微倾斜 + 虚线边框，像贴在黑板上的小卡片
+- **已知修复**：`.status` / `.pager` 原先直接写死 `display: flex`，会覆盖浏览器 `[hidden] { display: none }` 的默认规则，导致"分析中…"提示框和分页条即使被 JS 设置 `hidden` 也不会消失。改用 `.foo:not([hidden]) { display: flex; ... }` 的写法后修复——这类 class 里显式声明 `display` 且元素又用 `hidden` 属性做显隐控制时，都要留意这个坑
+
 ## Key Design Decisions
 
 - **google-genai SDK + Pydantic response_schema**：让 SDK 完成 JSON 校验，无需手动解析
