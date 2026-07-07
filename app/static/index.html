@@ -4,11 +4,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>英语单词查背一体</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Schoolbell&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <header>
-        <h1>📖 英语单词查背一体</h1>
+        <div class="brand">
+            <svg class="brand-mark" width="30" height="26" viewBox="0 0 30 26" fill="none" aria-hidden="true">
+                <path d="M15 5C12 2.5 7.5 2 3 3v17c4.5-1 9-0.5 12 2 3-2.5 7.5-3 12-2V3c-4.5-1-9-0.5-12 2z"
+                      stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M15 5v17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            <div class="brand-text">
+                <h1>英语单词查背一体</h1>
+                <p class="tagline">贴句子 · 记生词 · 温故知新</p>
+            </div>
+        </div>
         <nav class="tabs">
             <button class="tab-btn active" data-tab="translate">翻译</button>
             <button class="tab-btn" data-tab="vocab">单词本 <span id="vocabCount"></span></button>

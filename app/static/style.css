@@ -1,15 +1,29 @@
+/* ───────────────────────────────────────────────
+   Chalkboard notebook — tokens
+   A study desk after class: dark board, chalk dust,
+   and key words underlined the way a teacher marks
+   up a sentence with a different stick of chalk.
+   ─────────────────────────────────────────────── */
 :root {
-    --bg: #1a1a1f;
-    --surface: #25252d;
-    --surface-2: #2f2f38;
-    --border: #3a3a44;
-    --text: #e6e6eb;
-    --text-dim: #9a9aa6;
-    --accent: #6c8ef0;
-    --accent-2: #8d6cf0;
-    --highlight: #f0c46c;
-    --danger: #e07a7a;
-    --success: #7fcf8f;
+    --board: #1b2d28;
+    --panel: #223832;
+    --panel-2: #2a463d;
+    --rail: #4a6357;
+    --wood: #5e3f2c;
+    --wood-light: #7c5a42;
+
+    --chalk: #f2efe3;
+    --chalk-dim: #9fb0a8;
+    --chalk-faint: #6d8177;
+
+    --chalk-yellow: #f0d675;
+    --chalk-blue: #7ec8e3;
+    --chalk-pink: #e88fa0;
+    --chalk-green: #8fd19e;
+
+    --danger: var(--chalk-pink);
+    --success: var(--chalk-green);
+    --accent: var(--chalk-blue);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,98 +31,139 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
         "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background-color: var(--board);
+    background-image:
+        radial-gradient(circle at 8% 15%, rgba(242, 239, 227, 0.035) 0, transparent 40%),
+        radial-gradient(circle at 85% 8%, rgba(242, 239, 227, 0.03) 0, transparent 35%),
+        radial-gradient(circle at 75% 70%, rgba(242, 239, 227, 0.025) 0, transparent 45%),
+        radial-gradient(circle at 20% 90%, rgba(242, 239, 227, 0.03) 0, transparent 35%);
+    color: var(--chalk);
     line-height: 1.6;
     min-height: 100vh;
 }
 
+:focus-visible {
+    outline: 2px solid var(--chalk-blue);
+    outline-offset: 2px;
+}
+
+/* ─────────── Header ─────────── */
 header {
-    background: var(--surface);
-    padding: 16px 24px;
-    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    padding: 18px 28px;
+    border-bottom: 5px solid var(--wood);
+    border-image: repeating-linear-gradient(
+        90deg, var(--wood) 0 10px, var(--wood-light) 10px 20px
+    ) 5;
     display: flex;
     align-items: center;
     gap: 24px;
     flex-wrap: wrap;
 }
 
-header h1 { font-size: 20px; font-weight: 600; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-mark { color: var(--chalk-yellow); flex-shrink: 0; }
+.brand-text h1 {
+    font-family: "Schoolbell", "Segoe UI", cursive;
+    font-size: 26px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    line-height: 1.1;
+}
+.tagline {
+    font-size: 12px;
+    color: var(--chalk-faint);
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
 
 .tabs { display: flex; gap: 4px; margin-left: auto; }
 
 .tab-btn {
     background: transparent;
-    color: var(--text-dim);
+    color: var(--chalk-dim);
     border: 1px solid transparent;
     padding: 8px 16px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
+    font-family: inherit;
 }
-.tab-btn:hover { color: var(--text); background: var(--surface-2); }
-.tab-btn.active { color: var(--accent); border-color: var(--accent); }
+.tab-btn:hover { color: var(--chalk); background: var(--panel-2); }
+.tab-btn.active {
+    color: var(--board);
+    background: var(--chalk-yellow);
+    font-weight: 600;
+}
 
-main { max-width: 900px; margin: 0 auto; padding: 24px; }
+main { max-width: 900px; margin: 0 auto; padding: 28px 24px 64px; }
 
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 
+/* ─────────── Form ─────────── */
 #translateForm { display: flex; flex-direction: column; gap: 12px; }
 
 #sentenceInput {
     width: 100%;
     min-height: 100px;
-    padding: 12px;
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    padding: 14px;
+    background: var(--panel);
+    color: var(--chalk);
+    border: 1px dashed var(--rail);
+    border-radius: 6px;
     font-size: 16px;
     font-family: inherit;
     resize: vertical;
 }
-#sentenceInput:focus { outline: none; border-color: var(--accent); }
+#sentenceInput::placeholder { color: var(--chalk-faint); font-style: italic; }
+#sentenceInput:focus { outline: none; border-color: var(--chalk-blue); border-style: solid; }
 
 .row { display: flex; gap: 8px; }
 
 button {
-    background: var(--accent);
-    color: white;
+    background: var(--chalk-blue);
+    color: var(--board);
     border: none;
     padding: 10px 20px;
     border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
+    font-weight: 600;
     font-family: inherit;
+    transition: filter 0.15s, transform 0.1s;
 }
-button:hover { filter: brightness(1.1); }
+button:hover { filter: brightness(1.08); }
+button:active { transform: translateY(1px); }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.secondary, #clearBtn {
-    background: var(--surface-2);
-    color: var(--text);
-    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--chalk-dim);
+    border: 1px dashed var(--rail);
+    font-weight: 400;
 }
-button.danger { background: var(--danger); }
+button.danger { background: var(--chalk-pink); }
 button.ghost {
     background: transparent;
-    color: var(--text-dim);
-    border: 1px solid var(--border);
+    color: var(--chalk-dim);
+    border: 1px dashed var(--rail);
+    font-weight: 400;
 }
 
+/* ─────────── Status / error ─────────── */
 .status {
     margin-top: 20px;
     padding: 16px;
-    background: var(--surface);
+    background: var(--panel);
+    border: 1px dashed var(--rail);
     border-radius: 8px;
-    display: flex;
-    align-items: center;
     gap: 12px;
 }
+.status:not([hidden]) { display: flex; align-items: center; }
 .spinner {
     width: 16px; height: 16px;
-    border: 2px solid var(--text-dim);
-    border-top-color: var(--accent);
+    border: 2px solid var(--chalk-faint);
+    border-top-color: var(--chalk-yellow);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -117,182 +172,256 @@ button.ghost {
 .error {
     margin-top: 20px;
     padding: 12px 16px;
-    background: rgba(224, 122, 122, 0.15);
-    border: 1px solid var(--danger);
-    color: var(--danger);
+    background: rgba(232, 143, 160, 0.12);
+    border: 1px dashed var(--danger);
+    color: var(--chalk-pink);
     border-radius: 8px;
+}
+
+/* ─────────── Result card ─────────── */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+    #result:not([hidden]) { animation: fadeInUp 0.35s ease both; }
 }
 
 .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
+    background: var(--panel);
+    border: 1px solid var(--rail);
     border-radius: 8px;
-    padding: 16px;
+    padding: 18px;
     margin-top: 16px;
 }
-.translation-card h3 { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; }
-.translation-card h3:not(:first-child) { margin-top: 12px; }
-.sentence { font-size: 17px; line-height: 1.8; }
-.translation { font-size: 16px; color: var(--text); }
-.hint { font-size: 12px; color: var(--text-dim); margin-top: 12px; }
+.translation-card h3 {
+    font-family: "Schoolbell", cursive;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--chalk-dim);
+    letter-spacing: 0.5px;
+}
+.translation-card h3:not(:first-child) { margin-top: 14px; }
+.sentence { font-size: 18px; line-height: 2; margin-top: 2px; }
+.translation { font-size: 16px; color: var(--chalk); margin-top: 2px; }
+.hint { font-size: 12px; color: var(--chalk-faint); margin-top: 14px; }
 
+/* Words in the rendered sentence, underlined like colored chalk */
 .token {
     display: inline;
     border-radius: 3px;
     transition: background 0.15s;
+    padding: 1px 1px;
 }
 .token.clickable { cursor: pointer; }
-.token.clickable:hover { background: var(--surface-2); }
+.token.clickable:hover { background: var(--panel-2); }
+
 .token.highlighted {
-    color: var(--highlight);
-    border-bottom: 2px solid var(--highlight);
-    font-weight: 500;
+    font-weight: 600;
+    background-repeat: repeat-x;
+    background-position: 0 96%;
+    background-size: 14px 6px;
+    padding-bottom: 3px;
 }
-.token.added { color: var(--success); }
-.token.added::after { content: " ✓"; font-size: 12px; }
+.token.highlighted:nth-of-type(3n+1) {
+    color: var(--chalk-yellow);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%23f0d675' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.token.highlighted:nth-of-type(3n+2) {
+    color: var(--chalk-blue);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%237ec8e3' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.token.highlighted:nth-of-type(3n) {
+    color: var(--chalk-pink);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%23e88fa0' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+.token.added { color: var(--chalk-green); }
+.token.added::after { content: " \2713"; font-size: 12px; }
 
 .section-title {
-    font-size: 14px;
-    color: var(--text-dim);
-    margin-top: 24px;
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    font-family: "Schoolbell", cursive;
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--chalk-yellow);
+    margin-top: 26px;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
 }
 
-.key-words { display: flex; flex-direction: column; gap: 12px; }
+/* ─────────── Key word cards ─────────── */
+.key-words {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+}
 
 .kw-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    background: var(--panel);
+    border: 1px dashed var(--rail);
+    border-radius: 6px;
     padding: 14px;
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px 12px;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    position: relative;
+    transform: rotate(var(--tilt, -0.4deg));
 }
-.kw-card.focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108, 142, 240, 0.2); }
+.kw-card:nth-of-type(3n+1) { --tilt: -0.6deg; border-top: 3px solid var(--chalk-yellow); }
+.kw-card:nth-of-type(3n+2) { --tilt: 0.5deg; border-top: 3px solid var(--chalk-blue); }
+.kw-card:nth-of-type(3n) { --tilt: -0.3deg; border-top: 3px solid var(--chalk-pink); }
+.kw-card.focus { border-color: var(--chalk-blue); box-shadow: 0 0 0 2px rgba(126, 200, 227, 0.25); }
+
 .kw-card .word {
     font-size: 18px;
-    font-weight: 600;
-    color: var(--accent);
+    font-weight: 700;
+    color: var(--chalk);
 }
 .kw-card .pos {
-    font-size: 12px;
-    color: var(--text-dim);
-    font-style: italic;
+    font-size: 11px;
+    color: var(--chalk-faint);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
     margin-left: 8px;
 }
 .kw-card .diff {
-    font-size: 11px;
+    font-size: 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
     padding: 2px 6px;
     border-radius: 3px;
-    background: var(--accent-2);
-    color: white;
+    border: 1px solid var(--chalk-faint);
+    color: var(--chalk-dim);
     margin-left: 6px;
     vertical-align: middle;
 }
 .kw-card .meaning { font-size: 14px; }
-.kw-card .meaning strong { color: var(--text-dim); font-weight: normal; margin-right: 6px; }
+.kw-card .meaning strong {
+    color: var(--chalk-faint);
+    font-weight: normal;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    margin-right: 6px;
+}
 .kw-card .example {
     font-size: 13px;
-    color: var(--text-dim);
+    color: var(--chalk-dim);
     font-style: italic;
-    padding-top: 6px;
-    border-top: 1px dashed var(--border);
-    grid-column: 1 / -1;
+    padding-top: 8px;
+    border-top: 1px dashed var(--rail);
 }
 .kw-card .actions {
     display: flex;
-    flex-direction: column;
     gap: 6px;
     align-items: stretch;
 }
-.kw-card .actions button { padding: 6px 12px; font-size: 12px; }
+.kw-card .actions button { padding: 6px 12px; font-size: 12px; flex: 1; }
 
+/* ─────────── Popover ─────────── */
 .popover {
     position: fixed;
-    background: var(--surface);
-    border: 1px solid var(--accent);
+    background: var(--panel);
+    border: 1px solid var(--chalk-blue);
     border-radius: 8px;
-    padding: 14px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    padding: 16px 14px 14px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
     max-width: 360px;
     z-index: 100;
 }
 .popover .close {
     position: absolute;
-    top: 6px; right: 8px;
+    top: 4px; right: 6px;
     background: transparent;
     border: none;
-    color: var(--text-dim);
+    color: var(--chalk-faint);
     font-size: 18px;
     cursor: pointer;
-    padding: 0;
+    padding: 4px 8px;
 }
+.spinner-wrap { font-size: 13px; color: var(--chalk-dim); }
 
+/* ─────────── Vocab notebook ─────────── */
 .vocab-controls {
     display: flex;
     gap: 12px;
     align-items: center;
-    margin-bottom: 16px;
+    margin-bottom: 18px;
 }
 #vocabSearch {
     flex: 1;
     padding: 10px 12px;
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--chalk);
+    border: 1px dashed var(--rail);
     border-radius: 6px;
     font-size: 14px;
 }
-#vocabSearch:focus { outline: none; border-color: var(--accent); }
+#vocabSearch::placeholder { color: var(--chalk-faint); }
+#vocabSearch:focus { outline: none; border-color: var(--chalk-blue); border-style: solid; }
 
-.vocab-list { display: flex; flex-direction: column; gap: 10px; }
+.vocab-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+}
 
 .vocab-row {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px 14px;
+    background: var(--panel);
+    border: 1px solid var(--rail);
+    border-radius: 6px;
+    padding: 14px;
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 8px;
+    align-content: start;
 }
 .vocab-row .row-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.vocab-row .row-head .word { font-size: 16px; font-weight: 600; color: var(--accent); }
-.vocab-row .row-head .pos { font-size: 12px; color: var(--text-dim); font-style: italic; }
+.vocab-row .row-head .word { font-size: 16px; font-weight: 700; color: var(--chalk); }
+.vocab-row .row-head .pos {
+    font-size: 11px;
+    color: var(--chalk-faint);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
 .vocab-row .meaning { font-size: 14px; }
 .vocab-row .example, .vocab-row .notes {
     font-size: 13px;
-    color: var(--text-dim);
+    color: var(--chalk-dim);
 }
 .vocab-row .actions { display: flex; gap: 6px; align-self: start; }
 .vocab-row .actions button { padding: 4px 10px; font-size: 12px; }
 .vocab-row textarea {
     width: 100%;
-    background: var(--bg);
-    color: var(--text);
-    border: 1px solid var(--border);
+    background: var(--board);
+    color: var(--chalk);
+    border: 1px dashed var(--rail);
     border-radius: 4px;
-    padding: 6px;
+    padding: 8px;
     font-family: inherit;
     font-size: 13px;
     margin-top: 4px;
     resize: vertical;
 }
+.vocab-row .edit-form { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.vocab-row .edit-form label {
+    font-size: 11px;
+    color: var(--chalk-faint);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
 
 .empty {
+    grid-column: 1 / -1;
     text-align: center;
-    color: var(--text-dim);
-    padding: 40px 20px;
+    color: var(--chalk-faint);
+    padding: 48px 20px;
+    font-family: "Schoolbell", cursive;
+    font-size: 18px;
 }
 
 .pager {
-    margin-top: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    margin-top: 20px;
     gap: 16px;
+    grid-column: 1 / -1;
 }
+.pager:not([hidden]) { display: flex; align-items: center; justify-content: center; }
 .pager button { padding: 6px 14px; font-size: 13px; }
+#pageInfo { font-size: 13px; color: var(--chalk-dim); font-family: ui-monospace, "SF Mono", Menlo, monospace; }
