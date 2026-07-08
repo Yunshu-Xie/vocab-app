@@ -99,8 +99,6 @@ class VocabResponse(BaseModel):
     pos: str
     meaning: str
     example: str
-    source_sentence: str
-    source_translation: str
     notes: str
     created_at: str
     usages: list[VocabUsage] = []

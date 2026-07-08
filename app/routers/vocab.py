@@ -19,24 +19,10 @@ router = APIRouter()
 
 @router.post("/vocab", response_model=VocabResponse, status_code=201)
 async def create_vocab(payload: VocabCreate, response: Response) -> VocabResponse:
-    try:
-        row = await asyncio.to_thread(insert_or_raise, payload.model_dump())
-    except db.DuplicateVocabError as exc:
-        # Meeting a known word/phrase again isn't an error worth blocking on —
-        # record this sentence as another usage instead of rejecting it.
-        row = await asyncio.to_thread(
-            db.add_vocab_usage,
-            exc.existing_id,
-            payload.source_sentence,
-            payload.source_translation,
-        )
+    row, created = await asyncio.to_thread(db.upsert_vocab, payload.model_dump())
+    if not created:
         response.status_code = 200
     return VocabResponse(**row)
-
-
-def insert_or_raise(data: dict) -> dict:
-    """Thin wrapper so we can `to_thread(insert_or_raise, data)` and catch in caller."""
-    return db.insert_vocab(data)
 
 
 @router.get("/vocab", response_model=VocabListResponse)

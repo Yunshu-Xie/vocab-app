@@ -28,6 +28,10 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The hidden attribute must win over any display set by a class, so JS
+   visibility toggling works no matter how an element is styled. */
+[hidden] { display: none !important; }
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
         "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
@@ -157,9 +161,10 @@ button.ghost {
     background: var(--panel);
     border: 1px dashed var(--rail);
     border-radius: 8px;
+    display: flex;
+    align-items: center;
     gap: 12px;
 }
-.status:not([hidden]) { display: flex; align-items: center; }
 .spinner {
     width: 16px; height: 16px;
     border: 2px solid var(--chalk-faint);
@@ -216,32 +221,38 @@ button.ghost {
 .token.clickable { cursor: pointer; }
 .token.clickable:hover { background: var(--panel-2); }
 
-.token.highlighted {
-    font-weight: 600;
-    background-repeat: repeat-x;
-    background-position: 0 96%;
-    background-size: 14px 6px;
-    padding-bottom: 3px;
-}
 /* Chalk color per key word (word or phrase), assigned by index in JS so a
    multi-word phrase's underline stays one consistent color end to end,
-   and the matching kw-card's top border always agrees with it. */
-.token.highlighted.chalk-0 {
-    color: var(--chalk-yellow);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%23f0d675' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+   and the matching kw-card's top border always agrees with it. This is
+   the single index-to-color mapping; everything else reads --chalk-color. */
+.chalk-0 { --chalk-color: var(--chalk-yellow); }
+.chalk-1 { --chalk-color: var(--chalk-blue); }
+.chalk-2 { --chalk-color: var(--chalk-pink); }
+
+.token.highlighted {
+    font-weight: 600;
+    color: var(--chalk-color);
+    position: relative;
+    padding-bottom: 3px;
 }
-.token.highlighted.chalk-1 {
-    color: var(--chalk-blue);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%237ec8e3' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
-}
-.token.highlighted.chalk-2 {
-    color: var(--chalk-pink);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%23e88fa0' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+/* The hand-drawn chalk wave, defined once and tinted via currentColor:
+   a color-agnostic SVG masks a currentColor-filled strip at the baseline. */
+.token.highlighted::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 6px;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x 0 0 / 14px 6px;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x 0 0 / 14px 6px;
 }
 .token.added { color: var(--chalk-green); }
-/* Only the last word of a phrase (or a lone word) gets the checkmark,
-   so a multi-span phrase doesn't show one per word. */
-.token.added.phrase-end::after { content: " \2713"; font-size: 12px; }
+.token.added::after { content: " \2713"; font-size: 12px; }
+/* A phrase spans several word tokens; only its last word gets the
+   checkmark so a saved phrase doesn't show one per word. */
+.token.added[data-phrase]:not(.phrase-end)::after { content: none; }
 
 .section-title {
     font-family: "Schoolbell", cursive;
@@ -271,9 +282,12 @@ button.ghost {
     position: relative;
     transform: rotate(var(--tilt, -0.4deg));
 }
-.kw-card.chalk-0 { --tilt: -0.6deg; border-top: 3px solid var(--chalk-yellow); }
-.kw-card.chalk-1 { --tilt: 0.5deg; border-top: 3px solid var(--chalk-blue); }
-.kw-card.chalk-2 { --tilt: -0.3deg; border-top: 3px solid var(--chalk-pink); }
+.kw-card.chalk-0 { --tilt: -0.6deg; }
+.kw-card.chalk-1 { --tilt: 0.5deg; }
+.kw-card.chalk-2 { --tilt: -0.3deg; }
+.kw-card.chalk-0, .kw-card.chalk-1, .kw-card.chalk-2 {
+    border-top: 3px solid var(--chalk-color);
+}
 .kw-card.focus { border-color: var(--chalk-blue); box-shadow: 0 0 0 2px rgba(126, 200, 227, 0.25); }
 
 .kw-card .word {
@@ -471,9 +485,11 @@ button.ghost {
 
 .pager {
     margin-top: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 16px;
     grid-column: 1 / -1;
 }
-.pager:not([hidden]) { display: flex; align-items: center; justify-content: center; }
 .pager button { padding: 6px 14px; font-size: 13px; }
 #pageInfo { font-size: 13px; color: var(--chalk-dim); font-family: ui-monospace, "SF Mono", Menlo, monospace; }

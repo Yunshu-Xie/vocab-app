@@ -130,6 +130,11 @@ function renderTranslation() {
     renderKeyWords();
 }
 
+// Chalk color assigned to a key word by its index; must cycle through the
+// same number of colors as the .chalk-N rules in style.css.
+const CHALK_COLOR_COUNT = 3;
+const chalkClass = (kwIdx) => `chalk-${kwIdx % CHALK_COLOR_COUNT}`;
+
 // Maps a token index (into lastTokens, including punctuation/space tokens)
 // to the aiKeyWords index whose [start_idx, end_idx] range covers it. A
 // key word spanning 2+ words (a phrase) covers every token in between,
@@ -156,7 +161,7 @@ function renderSentenceTokens() {
                 return;
             }
             const gap = document.createElement("span");
-            gap.className = `token highlighted chalk-${kwIdx % 3}`;
+            gap.className = `token highlighted ${chalkClass(kwIdx)}`;
             gap.textContent = tok.text;
             sentenceRendered.appendChild(gap);
             return;
@@ -168,11 +173,11 @@ function renderSentenceTokens() {
         span.dataset.lower = tok.lower;
         span.dataset.idx = String(idx);
         if (kwIdx !== undefined) {
-            span.classList.add("highlighted", `chalk-${kwIdx % 3}`);
+            span.classList.add("highlighted", chalkClass(kwIdx));
             span.dataset.phrase = String(kwIdx);
             if (isPhraseEnd) span.classList.add("phrase-end");
         }
-        span.addEventListener("click", (e) => onTokenClick(tok, span, e));
+        span.addEventListener("click", () => onTokenClick(tok, span));
         sentenceRendered.appendChild(span);
     });
 }
@@ -192,10 +197,9 @@ function buildKeyWordCard(kw, opts = {}) {
     const card = document.createElement("div");
     card.className = "kw-card";
     if (opts.kwIdx !== undefined) {
-        card.classList.add(`chalk-${opts.kwIdx % 3}`);
+        card.classList.add(chalkClass(opts.kwIdx));
         card.dataset.kwIdx = String(opts.kwIdx);
     }
-    card.dataset.lower = kw.word.toLowerCase();
 
     const main = document.createElement("div");
     main.innerHTML = `
@@ -224,7 +228,7 @@ function buildKeyWordCard(kw, opts = {}) {
         const rmBtn = document.createElement("button");
         rmBtn.className = "ghost";
         rmBtn.textContent = "✕ 不要这个";
-        rmBtn.addEventListener("click", () => removeAiPick(kw.word.toLowerCase()));
+        rmBtn.addEventListener("click", () => removeAiPick(opts.kwIdx));
         actions.appendChild(rmBtn);
     }
 
@@ -301,16 +305,19 @@ async function showLookupPopover(word, anchorRect) {
     positionPopover(anchorRect);
 }
 
-function positionPopover(anchorRect) {
-    const r = anchorRect;
+const VIEWPORT_MARGIN = 12;
+
+function clampLeft(left, width) {
+    return Math.max(VIEWPORT_MARGIN, Math.min(left, window.innerWidth - width - VIEWPORT_MARGIN));
+}
+
+function positionPopover(r) {
     const pw = popover.offsetWidth || 300;
     const ph = popover.offsetHeight || 200;
-    let left = r.left;
     let top = r.bottom + 8;
-    if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
-    if (top + ph > window.innerHeight - 12) top = r.top - ph - 8;
-    popover.style.left = `${Math.max(12, left)}px`;
-    popover.style.top = `${Math.max(12, top)}px`;
+    if (top + ph > window.innerHeight - VIEWPORT_MARGIN) top = r.top - ph - 8;
+    popover.style.left = `${clampLeft(r.left, pw)}px`;
+    popover.style.top = `${Math.max(VIEWPORT_MARGIN, top)}px`;
 }
 
 function closePopover() {
@@ -356,9 +363,7 @@ function showPhraseButton(rect, text) {
         showLookupPopover(text, rect);
     };
     const bw = phraseLookupBtn.offsetWidth || 160;
-    let left = rect.left + rect.width / 2 - bw / 2;
-    left = Math.max(12, Math.min(left, window.innerWidth - bw - 12));
-    phraseLookupBtn.style.left = `${left}px`;
+    phraseLookupBtn.style.left = `${clampLeft(rect.left + rect.width / 2 - bw / 2, bw)}px`;
     phraseLookupBtn.style.top = `${rect.top - 44}px`;
 }
 
@@ -366,8 +371,8 @@ function hidePhraseButton() {
     phraseLookupBtn.hidden = true;
 }
 
-function removeAiPick(lower) {
-    aiKeyWords = aiKeyWords.filter((kw) => kw.word.toLowerCase() !== lower);
+function removeAiPick(kwIdx) {
+    aiKeyWords.splice(kwIdx, 1);
     renderTranslation();
 }
 
@@ -401,17 +406,13 @@ async function addToVocab(kw, btnEl, kwIdx) {
 }
 
 function markTokenAdded(kw, kwIdx) {
-    if (kwIdx !== undefined) {
-        sentenceRendered.querySelectorAll(`[data-phrase="${kwIdx}"]`)
-            .forEach((s) => s.classList.add("added"));
-        return;
-    }
-    // Manual single-word lookups (click or drag-select) aren't tied to an
-    // aiKeyWords index, but a plain clicked word still has a matching span.
-    if (!/\s/.test(kw.word)) {
-        sentenceRendered.querySelectorAll(`.token[data-lower="${CSS.escape(kw.word.toLowerCase())}"]`)
-            .forEach((s) => s.classList.add("added", "phrase-end"));
-    }
+    // AI picks are found by their key-word index; manual single-word lookups
+    // by the word itself (a manually looked-up phrase has no matching span).
+    const spans = kwIdx !== undefined
+        ? sentenceRendered.querySelectorAll(`[data-phrase="${kwIdx}"]`)
+        : sentenceRendered.querySelectorAll(
+            `.token[data-lower="${CSS.escape(kw.word.toLowerCase())}"]`);
+    spans.forEach((s) => s.classList.add("added"));
 }
 
 // ─────────── Vocab Tab ───────────
@@ -480,7 +481,8 @@ function buildVocabRow(row) {
         ${row.example ? `<div class="example">e.g. ${escapeHtml(row.example)}</div>` : ""}
         ${row.notes ? `<div class="notes">📝 ${escapeHtml(row.notes)}</div>` : ""}
     `;
-    main.appendChild(buildUsagesBlock(row.usages || []));
+    const usagesBlock = buildUsagesBlock(row.usages || []);
+    if (usagesBlock) main.appendChild(usagesBlock);
 
     const actions = document.createElement("div");
     actions.className = "actions";
@@ -508,9 +510,9 @@ function buildVocabRow(row) {
 const USAGES_COLLAPSED_COUNT = 2;
 
 function buildUsagesBlock(usages) {
+    if (usages.length === 0) return null;
     const wrap = document.createElement("div");
     wrap.className = "usages";
-    if (usages.length === 0) return wrap;
 
     usages.forEach((u, i) => {
         const item = document.createElement("div");

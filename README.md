@@ -54,6 +54,7 @@ app/
 │   └── vocab.py           # CRUD /api/vocab
 ├── services/
 │   ├── gemini.py          # google-genai wrapper, structured output
+│   ├── tokenize.py        # regex tokenizer + phrase locating (no LLM)
 │   └── db.py              # stdlib sqlite3 wrapper, no ORM
 └── static/                # vanilla HTML/CSS/JS, no build step
 ```

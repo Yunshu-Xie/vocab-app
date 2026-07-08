@@ -15,8 +15,6 @@ CREATE TABLE IF NOT EXISTS vocab (
     pos TEXT NOT NULL DEFAULT '',
     meaning TEXT NOT NULL,
     example TEXT NOT NULL DEFAULT '',
-    source_sentence TEXT NOT NULL DEFAULT '',
-    source_translation TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     UNIQUE(word, pos)
@@ -31,6 +29,8 @@ CREATE TABLE IF NOT EXISTS vocab_usage (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_usage_vocab ON vocab_usage(vocab_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_unique
+    ON vocab_usage(vocab_id, source_sentence);
 """
 
 
@@ -58,16 +58,9 @@ def _row_to_dict(row: sqlite3.Row) -> dict:
     return {k: row[k] for k in row.keys()}
 
 
-def _fetch_usages(conn: sqlite3.Connection, vocab_id: int) -> list[dict]:
-    rows = conn.execute(
-        "SELECT source_sentence, source_translation, created_at "
-        "FROM vocab_usage WHERE vocab_id = ? ORDER BY created_at ASC",
-        (vocab_id,),
-    ).fetchall()
-    return [_row_to_dict(r) for r in rows]
-
-
-def _fetch_usages_bulk(conn: sqlite3.Connection, vocab_ids: list[int]) -> dict[int, list[dict]]:
+def _fetch_usages_bulk(
+    conn: sqlite3.Connection, vocab_ids: list[int]
+) -> dict[int, list[dict]]:
     if not vocab_ids:
         return {}
     placeholders = ",".join("?" for _ in vocab_ids)
@@ -78,113 +71,67 @@ def _fetch_usages_bulk(conn: sqlite3.Connection, vocab_ids: list[int]) -> dict[i
     ).fetchall()
     by_vocab: dict[int, list[dict]] = {vid: [] for vid in vocab_ids}
     for r in rows:
-        by_vocab[r["vocab_id"]].append(
-            {
-                "source_sentence": r["source_sentence"],
-                "source_translation": r["source_translation"],
-                "created_at": r["created_at"],
-            }
-        )
+        entry = _row_to_dict(r)
+        by_vocab[entry.pop("vocab_id")].append(entry)
     return by_vocab
 
 
-class DuplicateVocabError(Exception):
-    """Raised when (word, pos) already exists. Carries the existing row's id."""
+def _get_vocab_with_usages(conn: sqlite3.Connection, vocab_id: int) -> Optional[dict]:
+    row = conn.execute("SELECT * FROM vocab WHERE id = ?", (vocab_id,)).fetchone()
+    if row is None:
+        return None
+    result = _row_to_dict(row)
+    result["usages"] = _fetch_usages_bulk(conn, [vocab_id])[vocab_id]
+    return result
 
-    def __init__(self, existing_id: int):
-        super().__init__(f"vocab already exists (id={existing_id})")
-        self.existing_id = existing_id
 
+def upsert_vocab(data: dict, db_path: Optional[str] = None) -> tuple[dict, bool]:
+    """Insert a vocab entry, or record another usage of an existing (word, pos).
 
-def insert_vocab(data: dict, db_path: Optional[str] = None) -> dict:
-    """Insert a vocab row. Raises DuplicateVocabError if (word, pos) collides."""
+    Meeting a known word/phrase again isn't an error worth blocking on — the
+    sentence it was met in is appended to its usage history instead (the
+    UNIQUE index on (vocab_id, source_sentence) makes re-adding the exact
+    same sentence a no-op). Returns (row incl. usages, created).
+    """
     created_at = datetime.now(timezone.utc).isoformat()
     with get_conn(db_path) as conn:
         existing = conn.execute(
             "SELECT id FROM vocab WHERE word = ? AND pos = ?",
             (data["word"], data.get("pos", "")),
         ).fetchone()
-        if existing is not None:
-            raise DuplicateVocabError(existing["id"])
+        if existing is None:
+            created = True
+            vocab_id = conn.execute(
+                """
+                INSERT INTO vocab (word, lemma, pos, meaning, example, notes, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    data["word"],
+                    data.get("lemma", ""),
+                    data.get("pos", ""),
+                    data["meaning"],
+                    data.get("example", ""),
+                    data.get("notes", ""),
+                    created_at,
+                ),
+            ).lastrowid
+        else:
+            created = False
+            vocab_id = existing["id"]
 
-        cursor = conn.execute(
-            """
-            INSERT INTO vocab
-              (word, lemma, pos, meaning, example,
-               source_sentence, source_translation, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                data["word"],
-                data.get("lemma", ""),
-                data.get("pos", ""),
-                data["meaning"],
-                data.get("example", ""),
-                data.get("source_sentence", ""),
-                data.get("source_translation", ""),
-                data.get("notes", ""),
-                created_at,
-            ),
-        )
-        new_id = cursor.lastrowid
-        # The usage that created this entry is usage #1, so `usages` is a
-        # complete history from the start rather than a special-cased list
-        # that only holds usage #2 onward.
         conn.execute(
-            "INSERT INTO vocab_usage (vocab_id, source_sentence, source_translation, created_at) "
+            "INSERT OR IGNORE INTO vocab_usage "
+            "(vocab_id, source_sentence, source_translation, created_at) "
             "VALUES (?, ?, ?, ?)",
             (
-                new_id,
+                vocab_id,
                 data.get("source_sentence", ""),
                 data.get("source_translation", ""),
                 created_at,
             ),
         )
-        row = conn.execute("SELECT * FROM vocab WHERE id = ?", (new_id,)).fetchone()
-        result = _row_to_dict(row)
-        result["usages"] = _fetch_usages(conn, new_id)
-        return result
-
-
-def add_vocab_usage(
-    vocab_id: int,
-    source_sentence: str,
-    source_translation: str = "",
-    db_path: Optional[str] = None,
-) -> Optional[dict]:
-    """Record another sentence a known word/phrase was encountered in.
-
-    Used when a duplicate (word, pos) is added instead of rejecting it
-    outright, so re-meeting a word in a new sentence grows its usage
-    history rather than being silently dropped. A no-op if this exact
-    sentence is already recorded (guards against duplicate-click retries).
-    """
-    with get_conn(db_path) as conn:
-        row = conn.execute("SELECT id FROM vocab WHERE id = ?", (vocab_id,)).fetchone()
-        if row is None:
-            return None
-
-        dup = conn.execute(
-            "SELECT id FROM vocab_usage WHERE vocab_id = ? AND source_sentence = ?",
-            (vocab_id, source_sentence),
-        ).fetchone()
-        if dup is None:
-            conn.execute(
-                "INSERT INTO vocab_usage "
-                "(vocab_id, source_sentence, source_translation, created_at) "
-                "VALUES (?, ?, ?, ?)",
-                (
-                    vocab_id,
-                    source_sentence,
-                    source_translation,
-                    datetime.now(timezone.utc).isoformat(),
-                ),
-            )
-
-        vocab_row = conn.execute("SELECT * FROM vocab WHERE id = ?", (vocab_id,)).fetchone()
-        result = _row_to_dict(vocab_row)
-        result["usages"] = _fetch_usages(conn, vocab_id)
-        return result
+        return _get_vocab_with_usages(conn, vocab_id), created
 
 
 def list_vocab(
@@ -219,15 +166,12 @@ def list_vocab(
 
 def get_vocab(vocab_id: int, db_path: Optional[str] = None) -> Optional[dict]:
     with get_conn(db_path) as conn:
-        row = conn.execute("SELECT * FROM vocab WHERE id = ?", (vocab_id,)).fetchone()
-        if row is None:
-            return None
-        result = _row_to_dict(row)
-        result["usages"] = _fetch_usages(conn, vocab_id)
-        return result
+        return _get_vocab_with_usages(conn, vocab_id)
 
 
-def update_vocab(vocab_id: int, patch: dict, db_path: Optional[str] = None) -> Optional[dict]:
+def update_vocab(
+    vocab_id: int, patch: dict, db_path: Optional[str] = None
+) -> Optional[dict]:
     fields = {k: v for k, v in patch.items() if v is not None}
     if not fields:
         return get_vocab(vocab_id, db_path)
@@ -239,12 +183,7 @@ def update_vocab(vocab_id: int, patch: dict, db_path: Optional[str] = None) -> O
         cursor = conn.execute(f"UPDATE vocab SET {set_clause} WHERE id = ?", params)
         if cursor.rowcount == 0:
             return None
-        row = conn.execute("SELECT * FROM vocab WHERE id = ?", (vocab_id,)).fetchone()
-        if row is None:
-            return None
-        result = _row_to_dict(row)
-        result["usages"] = _fetch_usages(conn, vocab_id)
-        return result
+        return _get_vocab_with_usages(conn, vocab_id)
 
 
 def delete_vocab(vocab_id: int, db_path: Optional[str] = None) -> bool:
