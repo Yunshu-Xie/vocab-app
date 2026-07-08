@@ -52,6 +52,11 @@ ruff format .
 - AI 高亮：`aiKeyWords` 里每个词/词组按其 `[start_idx, end_idx]` 覆盖的 token（含中间的空格/标点 token）整体加下划线，用 `chalk-N`（N = key word 在数组里的下标 mod 3）保证同一词组下划线颜色首尾一致，且和对应卡片顶部色条一致
 - 手动查词组：监听 `selectionchange`，当用户在原句里拖选出跨空格的文本时，在选区上方弹出「🔍 查询 "..."」按钮，点击后按选中文本调用 `/api/lookup`（与单词点击共用同一 popover 渲染逻辑）
 
+### Error handling (`app/services/gemini.py` → `app/routers/translate.py` → `app/static/app.js`)
+Gemini/SDK errors (raw exception text, upstream JSON, tracebacks) never reach the client. `_generate()` catches `google.genai.errors.APIError` and classifies it via `_classify_api_error(exc)` using only `exc.code`/`exc.status` (structured fields the SDK already parses out of the response) into one of a handful of fixed, actionable Chinese messages; any other exception (network, etc.) gets a fixed generic message. Both paths log the full exception server-side with `logger.exception` first.
+
+Every `GeminiError` carries `retryable: bool` — true for transient overload (503/`UNAVAILABLE`, `RESOURCE_EXHAUSTED`-adjacent timeouts), false when a retry can't help (bad API key, quota exhausted, malformed request). The router turns this into `HTTPException(502, {"message": ..., "retryable": ...})` (`_gemini_http_error`, shared by `/translate` and `/lookup`). The frontend's `api()` helper reads `data.detail.retryable` onto the thrown `Error`, and `showError(msg, onRetry)` only renders a "🔄 重试" button when the caller passes `onRetry` — wired up for the translate form (`translateForm.requestSubmit()`) and the lookup popover (re-running `showLookupPopover`), never for non-retryable errors.
+
 ### Storage (`app/services/db.py`)
 纯 stdlib `sqlite3`，无 ORM。`vocab` 表（词条本身：word/lemma/pos/meaning/example/notes）+ `UNIQUE(word, pos)` 防重；`vocab_usage` 表（`vocab_id` 外键 + `ON DELETE CASCADE`）一对多，是"在哪些句子里遇到过这个词"的**唯一**归属地——`vocab` 表上没有 source_sentence/source_translation 列，`VocabCreate` 里的这两个字段只作为 usage 记录的输入。
 

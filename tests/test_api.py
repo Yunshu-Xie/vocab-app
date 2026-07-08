@@ -125,12 +125,14 @@ def test_translate_empty_returns_422(client):
 
 @patch(
     "app.routers.translate.translate_sentence",
-    side_effect=GeminiError("API quota exceeded"),
+    side_effect=GeminiError("API quota exceeded", retryable=False),
 )
 def test_translate_gemini_error_returns_502(_mock, client):
     resp = client.post("/api/translate", json={"sentence": "Hello world"})
     assert resp.status_code == 502
-    assert "quota" in resp.json()["detail"]
+    detail = resp.json()["detail"]
+    assert detail["message"] == "API quota exceeded"
+    assert detail["retryable"] is False
 
 
 @patch("app.routers.translate.lookup_word", return_value=_FAKE_LOOKUP)

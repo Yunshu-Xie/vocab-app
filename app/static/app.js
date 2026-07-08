@@ -57,14 +57,30 @@ async function api(method, url, body) {
         const detail = (data && (typeof data.detail === "string" ? data.detail : data.detail?.message)) || `HTTP ${resp.status}`;
         const err = new Error(detail);
         err.status = resp.status;
+        err.retryable = data?.detail?.retryable === true;
         err.data = data;
         throw err;
     }
     return data;
 }
 
-function showError(msg) {
-    errorDiv.textContent = `❌ ${msg}`;
+// Backend errors are already user-safe, fixed messages (see GeminiError in
+// app/services/gemini.py) — never raw SDK/network text. `onRetry` is only
+// offered when the server marked the failure retryable (e.g. transient
+// overload), not for things a retry can't fix (bad API key, bad request).
+function showError(msg, onRetry) {
+    errorDiv.innerHTML = "";
+    const text = document.createElement("span");
+    text.textContent = `❌ ${msg}`;
+    errorDiv.appendChild(text);
+    if (onRetry) {
+        const retryBtn = document.createElement("button");
+        retryBtn.type = "button";
+        retryBtn.className = "ghost";
+        retryBtn.textContent = "🔄 重试";
+        retryBtn.addEventListener("click", () => { hideError(); onRetry(); });
+        errorDiv.appendChild(retryBtn);
+    }
     errorDiv.hidden = false;
 }
 function hideError() { errorDiv.hidden = true; }
@@ -107,7 +123,7 @@ translateForm.addEventListener("submit", async (e) => {
         renderTranslation();
         resultDiv.hidden = false;
     } catch (err) {
-        showError(err.message);
+        showError(err.message, err.retryable ? () => translateForm.requestSubmit() : undefined);
     } finally {
         clearTimeout(t1);
         clearTimeout(t2);
@@ -290,8 +306,10 @@ async function showLookupPopover(word, anchorRect) {
             popover.innerHTML = `
                 <button class="close" type="button">×</button>
                 <p class="error" style="margin:0">查询失败：${escapeHtml(err.message)}</p>
+                ${err.retryable ? '<button type="button" class="ghost retry">🔄 重试</button>' : ""}
             `;
             popover.querySelector(".close").addEventListener("click", closePopover);
+            popover.querySelector(".retry")?.addEventListener("click", () => showLookupPopover(word, anchorRect));
             return;
         }
     }

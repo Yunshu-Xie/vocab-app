@@ -181,7 +181,13 @@ button.ghost {
     border: 1px dashed var(--danger);
     color: var(--chalk-pink);
     border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
+.error button { flex-shrink: 0; padding: 4px 10px; font-size: 12px; }
+.popover button.retry { margin-top: 8px; padding: 4px 10px; font-size: 12px; }
 
 /* ─────────── Result card ─────────── */
 @keyframes fadeInUp {

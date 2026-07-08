@@ -19,12 +19,16 @@ from app.services.tokenize import find_phrase_range, tokenize
 router = APIRouter()
 
 
+def _gemini_http_error(exc: GeminiError) -> HTTPException:
+    return HTTPException(502, {"message": str(exc), "retryable": exc.retryable})
+
+
 @router.post("/translate", response_model=TranslateResponse)
 async def translate(req: TranslateRequest) -> TranslateResponse:
     try:
         data = await asyncio.to_thread(translate_sentence, req.sentence)
     except GeminiError as exc:
-        raise HTTPException(502, str(exc)) from exc
+        raise _gemini_http_error(exc) from exc
 
     tokens = tokenize(req.sentence)
     key_words = []
@@ -47,6 +51,6 @@ async def lookup(req: LookupRequest) -> KeyWord:
             lookup_word, req.word, req.sentence, req.translation
         )
     except GeminiError as exc:
-        raise HTTPException(502, str(exc)) from exc
+        raise _gemini_http_error(exc) from exc
 
     return KeyWord(**data)
