@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from app.models.schemas import (
     VocabCreate,
@@ -18,17 +18,19 @@ router = APIRouter()
 
 
 @router.post("/vocab", response_model=VocabResponse, status_code=201)
-async def create_vocab(payload: VocabCreate) -> VocabResponse:
+async def create_vocab(payload: VocabCreate, response: Response) -> VocabResponse:
     try:
         row = await asyncio.to_thread(insert_or_raise, payload.model_dump())
     except db.DuplicateVocabError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "message": "已在单词本中",
-                "existing_id": exc.existing_id,
-            },
-        ) from exc
+        # Meeting a known word/phrase again isn't an error worth blocking on —
+        # record this sentence as another usage instead of rejecting it.
+        row = await asyncio.to_thread(
+            db.add_vocab_usage,
+            exc.existing_id,
+            payload.source_sentence,
+            payload.source_translation,
+        )
+        response.status_code = 200
     return VocabResponse(**row)
 
 

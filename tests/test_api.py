@@ -197,15 +197,28 @@ def test_vocab_crud_flow(client):
     assert resp.status_code == 404
 
 
-def test_vocab_duplicate_returns_409(client):
+def test_vocab_duplicate_merges_as_new_usage(client):
+    first = client.post("/api/vocab", json=_vocab_payload())
+    assert first.status_code == 201
+    vid = first.json()["id"]
+    assert len(first.json()["usages"]) == 1
+
+    resp = client.post(
+        "/api/vocab",
+        json=_vocab_payload(source_sentence="A different sentence with ubiquitous."),
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == vid
+    assert len(data["usages"]) == 2
+    assert data["usages"][1]["source_sentence"] == "A different sentence with ubiquitous."
+
+
+def test_vocab_duplicate_same_sentence_does_not_duplicate_usage(client):
     client.post("/api/vocab", json=_vocab_payload())
     resp = client.post("/api/vocab", json=_vocab_payload())
-    assert resp.status_code == 409
-    detail = resp.json()["detail"]
-    # Detail comes through as a dict (we pass dict to HTTPException)
-    assert isinstance(detail, dict)
-    assert detail["message"] == "已在单词本中"
-    assert detail["existing_id"] > 0
+    assert resp.status_code == 200
+    assert len(resp.json()["usages"]) == 1
 
 
 def test_vocab_search(client):

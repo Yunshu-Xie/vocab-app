@@ -40,6 +40,32 @@ def test_duplicate_word_pos_raises():
     assert exc.value.existing_id > 0
 
 
+def test_insert_seeds_first_usage():
+    row = db.insert_vocab(_payload(source_sentence="The ubiquitous smartphone..."))
+    assert len(row["usages"]) == 1
+    assert row["usages"][0]["source_sentence"] == "The ubiquitous smartphone..."
+
+
+def test_add_vocab_usage_appends_new_sentence():
+    row = db.insert_vocab(_payload())
+    updated = db.add_vocab_usage(
+        row["id"], "Plastic is ubiquitous in the ocean.", "塑料在海洋中无处不在"
+    )
+    assert updated["id"] == row["id"]
+    assert len(updated["usages"]) == 2
+    assert updated["usages"][1]["source_sentence"] == "Plastic is ubiquitous in the ocean."
+
+
+def test_add_vocab_usage_dedupes_identical_sentence():
+    row = db.insert_vocab(_payload())
+    updated = db.add_vocab_usage(row["id"], row["source_sentence"], row["source_translation"])
+    assert len(updated["usages"]) == 1
+
+
+def test_add_vocab_usage_missing_vocab_returns_none():
+    assert db.add_vocab_usage(9999, "Some sentence.") is None
+
+
 def test_same_word_different_pos_ok():
     db.insert_vocab(_payload(pos="adjective"))
     # Inserting again with a different pos should succeed

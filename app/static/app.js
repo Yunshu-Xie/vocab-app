@@ -375,7 +375,10 @@ async function addToVocab(kw, btnEl, kwIdx) {
     btnEl.disabled = true;
     btnEl.textContent = "加入中…";
     try {
-        await api("POST", "/api/vocab", {
+        // Adding a word/phrase that's already in the notebook isn't
+        // rejected — the backend appends this sentence as a new usage
+        // and returns the merged entry instead.
+        const result = await api("POST", "/api/vocab", {
             word: kw.word,
             lemma: kw.lemma || "",
             pos: kw.pos || "",
@@ -386,19 +389,14 @@ async function addToVocab(kw, btnEl, kwIdx) {
             notes: "",
         });
         addedWords.add(kw.word.toLowerCase());
-        btnEl.textContent = "✓ 已加入";
+        const usageCount = result.usages ? result.usages.length : 1;
+        btnEl.textContent = usageCount > 1 ? `✓ 已加入（${usageCount} 处例句）` : "✓ 已加入";
         markTokenAdded(kw, kwIdx);
         await refreshVocabCount();
     } catch (err) {
-        if (err.status === 409) {
-            addedWords.add(kw.word.toLowerCase());
-            btnEl.textContent = "✓ 已在单词本";
-            markTokenAdded(kw, kwIdx);
-        } else {
-            btnEl.disabled = false;
-            btnEl.textContent = "+ 加入单词本";
-            showError(err.message);
-        }
+        btnEl.disabled = false;
+        btnEl.textContent = "+ 加入单词本";
+        showError(err.message);
     }
 }
 
@@ -481,8 +479,8 @@ function buildVocabRow(row) {
         <div class="meaning">${escapeHtml(row.meaning)}</div>
         ${row.example ? `<div class="example">e.g. ${escapeHtml(row.example)}</div>` : ""}
         ${row.notes ? `<div class="notes">📝 ${escapeHtml(row.notes)}</div>` : ""}
-        ${row.source_sentence ? `<div class="notes">📖 ${escapeHtml(row.source_sentence)}</div>` : ""}
     `;
+    main.appendChild(buildUsagesBlock(row.usages || []));
 
     const actions = document.createElement("div");
     actions.className = "actions";
@@ -501,6 +499,49 @@ function buildVocabRow(row) {
     div.appendChild(main);
     div.appendChild(actions);
     return div;
+}
+
+// Every time a known word/phrase is re-added from a new sentence, its
+// usage history grows by one. Show the first couple inline; the rest
+// collapse behind a "+N more" toggle so a well-worn word's card doesn't
+// dominate the list.
+const USAGES_COLLAPSED_COUNT = 2;
+
+function buildUsagesBlock(usages) {
+    const wrap = document.createElement("div");
+    wrap.className = "usages";
+    if (usages.length === 0) return wrap;
+
+    usages.forEach((u, i) => {
+        const item = document.createElement("div");
+        item.className = "usage-item";
+        if (i >= USAGES_COLLAPSED_COUNT) item.hidden = true;
+        const dateStr = (u.created_at || "").slice(0, 10);
+        item.innerHTML = `
+            <span class="usage-label">▸ 用法 ${i + 1}</span>
+            <span class="usage-date">${escapeHtml(dateStr)}</span>
+            <div class="usage-sentence">📖 ${escapeHtml(u.source_sentence)}</div>
+        `;
+        wrap.appendChild(item);
+    });
+
+    const extra = usages.length - USAGES_COLLAPSED_COUNT;
+    if (extra > 0) {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "ghost usages-toggle";
+        toggle.textContent = `+ 还有 ${extra} 条`;
+        toggle.addEventListener("click", () => {
+            const items = [...wrap.querySelectorAll(".usage-item")];
+            const expanding = items.slice(USAGES_COLLAPSED_COUNT).some((el) => el.hidden);
+            items.forEach((el, i) => {
+                if (i >= USAGES_COLLAPSED_COUNT) el.hidden = !expanding;
+            });
+            toggle.textContent = expanding ? "收起" : `+ 还有 ${extra} 条`;
+        });
+        wrap.appendChild(toggle);
+    }
+    return wrap;
 }
 
 function toggleEdit(rowEl, row) {

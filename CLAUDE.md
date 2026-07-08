@@ -52,15 +52,17 @@ ruff format .
 - 手动查词组：监听 `selectionchange`，当用户在原句里拖选出跨空格的文本时，在选区上方弹出「🔍 查询 "..."」按钮，点击后按选中文本调用 `/api/lookup`（与单词点击共用同一 popover 渲染逻辑）
 
 ### Storage (`app/services/db.py`)
-纯 stdlib `sqlite3`，无 ORM。`vocab` 表 + `UNIQUE(word, pos)` 防重。
+纯 stdlib `sqlite3`，无 ORM。`vocab` 表（词条本身：word/lemma/pos/meaning/example/notes）+ `UNIQUE(word, pos)` 防重，`vocab_usage` 表（`vocab_id` 外键 + `ON DELETE CASCADE`，记录每次在哪句话里遇到这个词）一对多。
+
+**重复添加 = 合并用法，不是报错**：`insert_vocab` 遇到 `(word, pos)` 冲突仍然 raise `DuplicateVocabError`（底层语义不变，`tests/test_db.py` 里也还在测这个），但 `app/routers/vocab.py` 的 `create_vocab` 捕获这个异常后会调用 `db.add_vocab_usage(existing_id, source_sentence, source_translation)`，把新句子作为该词的下一条用法记录追加进去，HTTP 状态码降级成 200（新建是 201）。`add_vocab_usage` 对完全相同的 `source_sentence` 会跳过插入（防止重复点击刷出重复用法）。`insert_vocab` 本身也会把创建时的例句写成 usage #1，所以 `VocabResponse.usages` 从第一次插入起就是完整历史，不是"第二次起才有"的特殊列表。
 
 ### API Layer
 - `POST /api/translate` — 接收 `{sentence}`，返回翻译 + tokens + key_words
 - `POST /api/lookup` — 接收 `{word, sentence, translation}`，返回单个词条
-- `POST /api/vocab` / `GET /api/vocab` / `PUT /api/vocab/{id}` / `DELETE /api/vocab/{id}` — 单词本 CRUD
+- `POST /api/vocab` / `GET /api/vocab` / `PUT /api/vocab/{id}` / `DELETE /api/vocab/{id}` — 单词本 CRUD；响应体里的 `usages: VocabUsage[]` 是该词全部遇到过的例句历史（按时间正序）
 
 ### Frontend (`app/static/`)
-纯 HTML/CSS/JS，无构建步骤。双 tab：翻译 / 单词本。翻译结果中原句以可点击 token 渲染，AI 推荐词高亮；点击未高亮词触发 lookup popover。
+纯 HTML/CSS/JS，无构建步骤。双 tab：翻译 / 单词本。翻译结果中原句以可点击 token 渲染，AI 推荐词高亮；点击未高亮词触发 lookup popover。单词本每条卡片展示 `usages`：默认展开前 2 条，多出的收进「+N more」折叠按钮（`buildUsagesBlock`）。
 
 #### 视觉设计：黑板笔记本主题
 `style.css` 是"黑板 + 彩色粉笔"视觉体系，围绕"英语学习笔记本"这个主题设计，刻意避开常见的"暖白+衬线+赭石"或"近黑+单一荧光色"AI 模板化配色：

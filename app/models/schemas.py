@@ -86,6 +86,12 @@ class VocabUpdate(BaseModel):
     notes: Optional[str] = Field(None, max_length=500)
 
 
+class VocabUsage(BaseModel):
+    source_sentence: str
+    source_translation: str
+    created_at: str
+
+
 class VocabResponse(BaseModel):
     id: int
     word: str
@@ -97,6 +103,7 @@ class VocabResponse(BaseModel):
     source_translation: str
     notes: str
     created_at: str
+    usages: list[VocabUsage] = []
 
 
 class VocabListResponse(BaseModel):

@@ -405,6 +405,39 @@ button.ghost {
 }
 .vocab-row .actions { display: flex; gap: 6px; align-self: start; }
 .vocab-row .actions button { padding: 4px 10px; font-size: 12px; }
+
+/* Usage history: every re-encounter of a known word adds one of these. */
+.usages {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--rail);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.usage-item {
+    font-size: 12px;
+}
+.usage-label {
+    font-family: "Schoolbell", cursive;
+    font-size: 13px;
+    color: var(--chalk-yellow);
+}
+.usage-date {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 10px;
+    color: var(--chalk-faint);
+    margin-left: 6px;
+}
+.usage-sentence {
+    color: var(--chalk-dim);
+    margin-top: 2px;
+}
+.usages-toggle {
+    align-self: flex-start;
+    padding: 3px 10px;
+    font-size: 11px;
+}
 .vocab-row textarea {
     width: 100%;
     background: var(--board);
