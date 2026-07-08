@@ -67,6 +67,57 @@ def test_translate_success(_mock, client):
     assert rebuilt == "The ubiquitous smartphone has revolutionized communication."
 
 
+_FAKE_TRANSLATE_WITH_PHRASE = {
+    "translation": "尽管下雨了，他们还是放弃了。",
+    "key_words": [
+        {
+            "word": "give up",
+            "lemma": "give up",
+            "pos": "phrasal verb",
+            "meaning_in_context": "放弃了",
+            "general_meaning": "放弃",
+            "example": "Never give up on your dreams.",
+            "difficulty": "B1",
+        },
+        {
+            "word": "In spite of",
+            "lemma": "in spite of",
+            "pos": "collocation",
+            "meaning_in_context": "尽管",
+            "general_meaning": "尽管，不顾",
+            "example": "In spite of the cold, she went out.",
+            "difficulty": "B2",
+        },
+    ],
+}
+
+
+@patch("app.routers.translate.translate_sentence", return_value=_FAKE_TRANSLATE_WITH_PHRASE)
+def test_translate_locates_phrase_key_words(_mock, client):
+    resp = client.post(
+        "/api/translate",
+        json={"sentence": "In spite of the rain, they decided to give up."},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    key_words = {kw["word"]: kw for kw in data["key_words"]}
+
+    give_up = key_words["give up"]
+    assert give_up["start_idx"] is not None and give_up["end_idx"] is not None
+    span = "".join(
+        t["text"] for t in data["tokens"][give_up["start_idx"] : give_up["end_idx"] + 1]
+    )
+    assert span == "give up"
+
+    in_spite_of = key_words["In spite of"]
+    assert in_spite_of["start_idx"] is not None and in_spite_of["end_idx"] is not None
+    span = "".join(
+        t["text"]
+        for t in data["tokens"][in_spite_of["start_idx"] : in_spite_of["end_idx"] + 1]
+    )
+    assert span.lower() == "in spite of"
+
+
 def test_translate_empty_returns_422(client):
     resp = client.post("/api/translate", json={"sentence": ""})
     assert resp.status_code == 422

@@ -29,6 +29,7 @@ const sentenceRendered = $("sentenceRendered");
 const translationText = $("translationText");
 const keyWordsDiv = $("keyWords");
 const popover = $("popover");
+const phraseLookupBtn = $("phraseLookupBtn");
 
 const vocabSearch = $("vocabSearch");
 const vocabList = $("vocabList");
@@ -129,24 +130,48 @@ function renderTranslation() {
     renderKeyWords();
 }
 
-function aiHighlightedLowers() {
-    return new Set(aiKeyWords.map((kw) => kw.word.toLowerCase()));
+// Maps a token index (into lastTokens, including punctuation/space tokens)
+// to the aiKeyWords index whose [start_idx, end_idx] range covers it. A
+// key word spanning 2+ words (a phrase) covers every token in between,
+// including the space between them, so its underline stays continuous.
+function buildHighlightMap() {
+    const map = new Map();
+    aiKeyWords.forEach((kw, kwIdx) => {
+        if (kw.start_idx == null || kw.end_idx == null) return;
+        for (let i = kw.start_idx; i <= kw.end_idx; i++) map.set(i, kwIdx);
+    });
+    return map;
 }
 
 function renderSentenceTokens() {
-    const highlighted = aiHighlightedLowers();
+    const highlightMap = buildHighlightMap();
     sentenceRendered.innerHTML = "";
     lastTokens.forEach((tok, idx) => {
+        const kwIdx = highlightMap.get(idx);
+        const isPhraseEnd = kwIdx !== undefined && aiKeyWords[kwIdx].end_idx === idx;
+
         if (!tok.is_word) {
-            sentenceRendered.appendChild(document.createTextNode(tok.text));
+            if (kwIdx === undefined) {
+                sentenceRendered.appendChild(document.createTextNode(tok.text));
+                return;
+            }
+            const gap = document.createElement("span");
+            gap.className = `token highlighted chalk-${kwIdx % 3}`;
+            gap.textContent = tok.text;
+            sentenceRendered.appendChild(gap);
             return;
         }
+
         const span = document.createElement("span");
         span.className = "token clickable";
         span.textContent = tok.text;
         span.dataset.lower = tok.lower;
         span.dataset.idx = String(idx);
-        if (highlighted.has(tok.lower)) span.classList.add("highlighted");
+        if (kwIdx !== undefined) {
+            span.classList.add("highlighted", `chalk-${kwIdx % 3}`);
+            span.dataset.phrase = String(kwIdx);
+            if (isPhraseEnd) span.classList.add("phrase-end");
+        }
         span.addEventListener("click", (e) => onTokenClick(tok, span, e));
         sentenceRendered.appendChild(span);
     });
@@ -155,17 +180,21 @@ function renderSentenceTokens() {
 function renderKeyWords() {
     keyWordsDiv.innerHTML = "";
     if (aiKeyWords.length === 0) {
-        keyWordsDiv.innerHTML = '<p class="empty">AI 未推荐关键词，可点击原句中任意单词查询。</p>';
+        keyWordsDiv.innerHTML = '<p class="empty">AI 未推荐关键词，可点击原句中任意单词查询，或拖选查词组。</p>';
         return;
     }
-    aiKeyWords.forEach((kw) => {
-        keyWordsDiv.appendChild(buildKeyWordCard(kw, { showRemove: true }));
+    aiKeyWords.forEach((kw, kwIdx) => {
+        keyWordsDiv.appendChild(buildKeyWordCard(kw, { showRemove: true, kwIdx }));
     });
 }
 
 function buildKeyWordCard(kw, opts = {}) {
     const card = document.createElement("div");
     card.className = "kw-card";
+    if (opts.kwIdx !== undefined) {
+        card.classList.add(`chalk-${opts.kwIdx % 3}`);
+        card.dataset.kwIdx = String(opts.kwIdx);
+    }
     card.dataset.lower = kw.word.toLowerCase();
 
     const main = document.createElement("div");
@@ -188,7 +217,7 @@ function buildKeyWordCard(kw, opts = {}) {
         addBtn.disabled = true;
         addBtn.textContent = "✓ 已加入";
     }
-    addBtn.addEventListener("click", () => addToVocab(kw, addBtn));
+    addBtn.addEventListener("click", () => addToVocab(kw, addBtn, opts.kwIdx));
     actions.appendChild(addBtn);
 
     if (opts.showRemove) {
@@ -216,22 +245,27 @@ function escapeHtml(s) {
 }
 
 function onTokenClick(tok, span, evt) {
-    const lower = tok.lower;
-    const cardInList = [...keyWordsDiv.querySelectorAll(".kw-card")]
-        .find((c) => c.dataset.lower === lower);
-    if (cardInList) {
-        cardInList.scrollIntoView({ behavior: "smooth", block: "center" });
-        cardInList.classList.add("focus");
-        setTimeout(() => cardInList.classList.remove("focus"), 1500);
-        return;
+    // A drag-selection releases its mouseup on a token too; let the
+    // selection-based phrase lookup handle that instead of firing a
+    // single-word lookup on top of it.
+    if (window.getSelection().toString().trim().length > 0) return;
+
+    const phraseIdx = span.dataset.phrase;
+    if (phraseIdx !== undefined) {
+        const cardInList = keyWordsDiv.querySelector(`[data-kw-idx="${phraseIdx}"]`);
+        if (cardInList) {
+            cardInList.scrollIntoView({ behavior: "smooth", block: "center" });
+            cardInList.classList.add("focus");
+            setTimeout(() => cardInList.classList.remove("focus"), 1500);
+            return;
+        }
     }
-    showLookupPopover(tok, span, evt);
+    showLookupPopover(tok.text, span.getBoundingClientRect());
 }
 
-async function showLookupPopover(tok, span, evt) {
+async function showLookupPopover(word, anchorRect) {
     closePopover();
-    const word = tok.text;
-    const lower = tok.lower;
+    const lower = word.toLowerCase();
 
     popover.hidden = false;
     popover.innerHTML = `
@@ -239,7 +273,7 @@ async function showLookupPopover(tok, span, evt) {
         <div class="spinner-wrap">🔍 查询 "${escapeHtml(word)}"…</div>
     `;
     popover.querySelector(".close").addEventListener("click", closePopover);
-    positionPopover(span);
+    positionPopover(anchorRect);
 
     let kw = lookupCache.get(lower);
     if (!kw) {
@@ -264,11 +298,11 @@ async function showLookupPopover(tok, span, evt) {
     close.addEventListener("click", closePopover);
     popover.appendChild(close);
     popover.appendChild(buildKeyWordCard(kw, { showRemove: false }));
-    positionPopover(span);
+    positionPopover(anchorRect);
 }
 
-function positionPopover(anchor) {
-    const r = anchor.getBoundingClientRect();
+function positionPopover(anchorRect) {
+    const r = anchorRect;
     const pw = popover.offsetWidth || 300;
     const ph = popover.offsetHeight || 200;
     let left = r.left;
@@ -288,15 +322,56 @@ document.addEventListener("click", (e) => {
     if (popover.hidden) return;
     if (popover.contains(e.target)) return;
     if (e.target.classList && e.target.classList.contains("token")) return;
+    if (e.target === phraseLookupBtn) return;
     closePopover();
 });
+
+// ─────────── Phrase selection (drag to look up 2+ words) ───────────
+document.addEventListener("selectionchange", debounce(handleSelectionChange, 120));
+
+function handleSelectionChange() {
+    const sel = window.getSelection();
+    const text = sel.toString().trim();
+    if (!text || !/\s/.test(text) || sel.rangeCount === 0) {
+        hidePhraseButton();
+        return;
+    }
+    const range = sel.getRangeAt(0);
+    const anchorEl = range.commonAncestorContainer.nodeType === 1
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement;
+    if (!anchorEl || !sentenceRendered.contains(anchorEl)) {
+        hidePhraseButton();
+        return;
+    }
+    showPhraseButton(range.getBoundingClientRect(), text);
+}
+
+function showPhraseButton(rect, text) {
+    phraseLookupBtn.textContent = `🔍 查询 "${text}"`;
+    phraseLookupBtn.hidden = false;
+    phraseLookupBtn.onclick = () => {
+        window.getSelection().removeAllRanges();
+        hidePhraseButton();
+        showLookupPopover(text, rect);
+    };
+    const bw = phraseLookupBtn.offsetWidth || 160;
+    let left = rect.left + rect.width / 2 - bw / 2;
+    left = Math.max(12, Math.min(left, window.innerWidth - bw - 12));
+    phraseLookupBtn.style.left = `${left}px`;
+    phraseLookupBtn.style.top = `${rect.top - 44}px`;
+}
+
+function hidePhraseButton() {
+    phraseLookupBtn.hidden = true;
+}
 
 function removeAiPick(lower) {
     aiKeyWords = aiKeyWords.filter((kw) => kw.word.toLowerCase() !== lower);
     renderTranslation();
 }
 
-async function addToVocab(kw, btnEl) {
+async function addToVocab(kw, btnEl, kwIdx) {
     btnEl.disabled = true;
     btnEl.textContent = "加入中…";
     try {
@@ -312,13 +387,13 @@ async function addToVocab(kw, btnEl) {
         });
         addedWords.add(kw.word.toLowerCase());
         btnEl.textContent = "✓ 已加入";
-        markTokenAdded(kw.word.toLowerCase());
+        markTokenAdded(kw, kwIdx);
         await refreshVocabCount();
     } catch (err) {
         if (err.status === 409) {
             addedWords.add(kw.word.toLowerCase());
             btnEl.textContent = "✓ 已在单词本";
-            markTokenAdded(kw.word.toLowerCase());
+            markTokenAdded(kw, kwIdx);
         } else {
             btnEl.disabled = false;
             btnEl.textContent = "+ 加入单词本";
@@ -327,9 +402,18 @@ async function addToVocab(kw, btnEl) {
     }
 }
 
-function markTokenAdded(lower) {
-    sentenceRendered.querySelectorAll(`.token[data-lower="${CSS.escape(lower)}"]`)
-        .forEach((s) => s.classList.add("added"));
+function markTokenAdded(kw, kwIdx) {
+    if (kwIdx !== undefined) {
+        sentenceRendered.querySelectorAll(`[data-phrase="${kwIdx}"]`)
+            .forEach((s) => s.classList.add("added"));
+        return;
+    }
+    // Manual single-word lookups (click or drag-select) aren't tied to an
+    // aiKeyWords index, but a plain clicked word still has a matching span.
+    if (!/\s/.test(kw.word)) {
+        sentenceRendered.querySelectorAll(`.token[data-lower="${CSS.escape(kw.word.toLowerCase())}"]`)
+            .forEach((s) => s.classList.add("added", "phrase-end"));
+    }
 }
 
 // ─────────── Vocab Tab ───────────

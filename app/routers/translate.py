@@ -11,6 +11,7 @@ from app.models.schemas import (
     KeyWord,
     LookupRequest,
     Token,
+    TranslatedKeyWord,
     TranslateRequest,
     TranslateResponse,
 )
@@ -19,6 +20,7 @@ from app.services.gemini import GeminiError, lookup_word, translate_sentence
 router = APIRouter()
 
 _WORD_RE = re.compile(r"[A-Za-z][A-Za-z'-]*|[^A-Za-z]+")
+_PHRASE_WORD_RE = re.compile(r"[A-Za-z'-]+")
 
 
 def _tokenize(sentence: str) -> list[Token]:
@@ -35,6 +37,25 @@ def _tokenize(sentence: str) -> list[Token]:
     return tokens
 
 
+def _find_phrase_range(tokens: list[Token], phrase: str) -> tuple[int, int] | None:
+    """Locate `phrase` (1+ words) as a contiguous run of word-tokens.
+
+    Returns the (start, end) inclusive index range into `tokens`, or None if
+    the phrase's words don't appear in that exact order (e.g. Gemini
+    paraphrased it instead of quoting the sentence verbatim).
+    """
+    words = [w.lower() for w in _PHRASE_WORD_RE.findall(phrase)]
+    if not words:
+        return None
+    word_positions = [i for i, t in enumerate(tokens) if t.is_word]
+    n = len(words)
+    for start in range(len(word_positions) - n + 1):
+        idxs = word_positions[start : start + n]
+        if all(tokens[idxs[k]].lower == words[k] for k in range(n)):
+            return idxs[0], idxs[-1]
+    return None
+
+
 @router.post("/translate", response_model=TranslateResponse)
 async def translate(req: TranslateRequest) -> TranslateResponse:
     try:
@@ -42,10 +63,17 @@ async def translate(req: TranslateRequest) -> TranslateResponse:
     except GeminiError as exc:
         raise HTTPException(502, str(exc)) from exc
 
+    tokens = _tokenize(req.sentence)
+    key_words = []
+    for kw in data["key_words"]:
+        rng = _find_phrase_range(tokens, kw["word"])
+        start_idx, end_idx = rng if rng else (None, None)
+        key_words.append(TranslatedKeyWord(**kw, start_idx=start_idx, end_idx=end_idx))
+
     return TranslateResponse(
         translation=data["translation"],
-        tokens=_tokenize(req.sentence),
-        key_words=[KeyWord(**kw) for kw in data["key_words"]],
+        tokens=tokens,
+        key_words=key_words,
     )
 
 

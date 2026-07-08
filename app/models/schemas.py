@@ -10,7 +10,7 @@ class TranslateRequest(BaseModel):
 
 
 class LookupRequest(BaseModel):
-    word: str = Field(..., min_length=1, max_length=64)
+    word: str = Field(..., min_length=1, max_length=120)
     sentence: str = Field(..., min_length=1, max_length=1000)
     translation: str = Field("", max_length=1000)
 
@@ -22,11 +22,21 @@ class Token(BaseModel):
 
 
 class KeyWord(BaseModel):
-    word: str = Field(..., description="The word as it appears in the sentence")
-    lemma: str = Field(..., description="Dictionary base form, e.g. 'run' for 'running'")
-    pos: str = Field(..., description="Part of speech, e.g. 'noun', 'verb', 'adjective'")
-    meaning_in_context: str = Field(..., description="本句中该词的中文含义")
-    general_meaning: str = Field(..., description="该词常见的中文释义")
+    word: str = Field(
+        ..., description="The word or fixed phrase exactly as it appears in the sentence"
+    )
+    lemma: str = Field(
+        ...,
+        description="Dictionary base form, e.g. 'run' for 'running'; "
+        "for a phrase, its canonical form, e.g. 'give up'",
+    )
+    pos: str = Field(
+        ...,
+        description="Part of speech, e.g. 'noun', 'verb', 'adjective'; "
+        "for multi-word expressions use 'phrasal verb', 'idiom', or 'collocation'",
+    )
+    meaning_in_context: str = Field(..., description="本句中该词/词组的中文含义")
+    general_meaning: str = Field(..., description="该词/词组常见的中文释义")
     example: str = Field(..., description="一句独立的英文例句（不同于原句）")
     difficulty: str = Field(..., description="CEFR 难度等级：A1/A2/B1/B2/C1/C2")
 
@@ -37,19 +47,31 @@ class TranslationPayload(BaseModel):
     translation: str = Field(..., description="原句的简洁中文翻译")
     key_words: list[KeyWord] = Field(
         ...,
-        description="从句中挑选的 2-5 个 B1 及以上难度、有学习价值的词；跳过 the/is/have 等常见词",
+        description="从句中挑选的 2-5 个 B1 及以上难度、有学习价值的词或固定词组；"
+        "跳过 the/is/have 等常见词",
+    )
+
+
+class TranslatedKeyWord(KeyWord):
+    """A KeyWord located back in the original sentence's token list."""
+
+    start_idx: Optional[int] = Field(
+        None, description="Index of the first token (inclusive) this word/phrase spans"
+    )
+    end_idx: Optional[int] = Field(
+        None, description="Index of the last token (inclusive) this word/phrase spans"
     )
 
 
 class TranslateResponse(BaseModel):
     translation: str
     tokens: list[Token]
-    key_words: list[KeyWord]
+    key_words: list[TranslatedKeyWord]
 
 
 class VocabCreate(BaseModel):
-    word: str = Field(..., min_length=1, max_length=64)
-    lemma: str = Field("", max_length=64)
+    word: str = Field(..., min_length=1, max_length=120)
+    lemma: str = Field("", max_length=120)
     pos: str = Field("", max_length=32)
     meaning: str = Field(..., min_length=1, max_length=500)
     example: str = Field("", max_length=500)

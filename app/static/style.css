@@ -223,20 +223,25 @@ button.ghost {
     background-size: 14px 6px;
     padding-bottom: 3px;
 }
-.token.highlighted:nth-of-type(3n+1) {
+/* Chalk color per key word (word or phrase), assigned by index in JS so a
+   multi-word phrase's underline stays one consistent color end to end,
+   and the matching kw-card's top border always agrees with it. */
+.token.highlighted.chalk-0 {
     color: var(--chalk-yellow);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%23f0d675' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
 }
-.token.highlighted:nth-of-type(3n+2) {
+.token.highlighted.chalk-1 {
     color: var(--chalk-blue);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%237ec8e3' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
 }
-.token.highlighted:nth-of-type(3n) {
+.token.highlighted.chalk-2 {
     color: var(--chalk-pink);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='6'%3E%3Cpath d='M0 4 Q3.5 0 7 4 T14 4' fill='none' stroke='%23e88fa0' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .token.added { color: var(--chalk-green); }
-.token.added::after { content: " \2713"; font-size: 12px; }
+/* Only the last word of a phrase (or a lone word) gets the checkmark,
+   so a multi-span phrase doesn't show one per word. */
+.token.added.phrase-end::after { content: " \2713"; font-size: 12px; }
 
 .section-title {
     font-family: "Schoolbell", cursive;
@@ -266,9 +271,9 @@ button.ghost {
     position: relative;
     transform: rotate(var(--tilt, -0.4deg));
 }
-.kw-card:nth-of-type(3n+1) { --tilt: -0.6deg; border-top: 3px solid var(--chalk-yellow); }
-.kw-card:nth-of-type(3n+2) { --tilt: 0.5deg; border-top: 3px solid var(--chalk-blue); }
-.kw-card:nth-of-type(3n) { --tilt: -0.3deg; border-top: 3px solid var(--chalk-pink); }
+.kw-card.chalk-0 { --tilt: -0.6deg; border-top: 3px solid var(--chalk-yellow); }
+.kw-card.chalk-1 { --tilt: 0.5deg; border-top: 3px solid var(--chalk-blue); }
+.kw-card.chalk-2 { --tilt: -0.3deg; border-top: 3px solid var(--chalk-pink); }
 .kw-card.focus { border-color: var(--chalk-blue); box-shadow: 0 0 0 2px rgba(126, 200, 227, 0.25); }
 
 .kw-card .word {
@@ -313,6 +318,20 @@ button.ghost {
     align-items: stretch;
 }
 .kw-card .actions button { padding: 6px 12px; font-size: 12px; flex: 1; }
+
+/* ─────────── Phrase selection button ─────────── */
+/* Appears above a drag-selected run of 2+ words, like a highlighter tab. */
+.phrase-lookup-btn {
+    position: fixed;
+    z-index: 101;
+    background: var(--chalk-yellow);
+    color: var(--board);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
 
 /* ─────────── Popover ─────────── */
 .popover {
