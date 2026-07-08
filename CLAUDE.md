@@ -10,7 +10,7 @@ Local English vocabulary tool: paste an English sentence → Gemini translates i
 
 ```bash
 # Install dependencies
-pip install -e .[dev]
+pip install -e '.[dev]'
 
 # Run the development server
 uvicorn app.main:app --reload
@@ -48,7 +48,7 @@ ruff format .
 - `tokenize(sentence)` 用一行正则把原句切成 token 列表（`is_word` 标记单词 vs 标点空格），前端据此渲染可点击的句子
 - `find_phrase_range(tokens, phrase)` 把 Gemini 返回的 `key_words[].word`（可能是词组）在 word-token 序列中做逐词、大小写不敏感的连续匹配（词组自身也用 `tokenize` 切词，保证"什么算一个词"只有一处定义），找到后把 `[start_idx, end_idx]`（`tokens` 的闭区间下标）写回 `TranslatedKeyWord`；找不到则为 `None`（该词/词组仍会显示为卡片，只是原句里不高亮——多见于 Gemini 改写了措辞/时态的情况）。这两个字段只存在于 `/api/translate` 响应里，不出现在 Gemini 的 `response_schema`（避免让模型误填）。
 
-### Phrase lookup (frontend, `app/static/app.js`)
+### Sentence rendering & lookup (frontend, `app/static/app.js`)
 - AI 高亮：`aiKeyWords` 里每个词/词组按其 `[start_idx, end_idx]` 覆盖的 token（含中间的空格/标点 token）整体加下划线，用 `chalk-N`（N = key word 在数组里的下标 mod 3）保证同一词组下划线颜色首尾一致，且和对应卡片顶部色条一致
 - 手动查词组：监听 `selectionchange`，当用户在原句里拖选出跨空格的文本时，在选区上方弹出「🔍 查询 "..."」按钮，点击后按选中文本调用 `/api/lookup`（与单词点击共用同一 popover 渲染逻辑）
 
@@ -63,9 +63,10 @@ Every `GeminiError` carries `retryable: bool` — true for transient overload (5
 **重复添加 = 合并用法，不是报错**：写入的唯一入口是 `upsert_vocab(data) -> (row, created)`，单事务内完成"(word, pos) 不存在则插入词条 + 无条件记录本次例句"。例句去重由 schema 层的 `UNIQUE(vocab_id, source_sentence)` 索引 + `INSERT OR IGNORE` 保证（原子，且对所有写入方生效），不是应用层 SELECT-then-INSERT。router 里 `create_vocab` 只做一件事：`created` 为 False 时把 201 降为 200。首次插入时创建例句就是 usage #1，所以 `VocabResponse.usages` 从第一次插入起就是完整历史。
 
 ### API Layer
-- `POST /api/translate` — 接收 `{sentence}`，返回翻译 + tokens + key_words
-- `POST /api/lookup` — 接收 `{word, sentence, translation}`，返回单个词条
-- `POST /api/vocab` / `GET /api/vocab` / `PUT /api/vocab/{id}` / `DELETE /api/vocab/{id}` — 单词本 CRUD；响应体里的 `usages: VocabUsage[]` 是该词全部遇到过的例句历史（按时间正序）
+- `POST /api/translate` — 接收 `{sentence}`，返回翻译 + tokens + key_words（每个 key word 含 `start_idx`/`end_idx`）
+- `POST /api/lookup` — 接收 `{word, sentence, translation}`（word 可以是词组），返回单个词条
+- `POST /api/vocab` / `GET /api/vocab` / `PUT /api/vocab/{id}` / `DELETE /api/vocab/{id}` — 单词本 CRUD；响应体里的 `usages: VocabUsage[]` 是该词全部遇到过的例句历史（按时间正序）；`POST /api/vocab` 新建返回 201，合并进已有词条的用法历史返回 200
+- Gemini 相关失败统一走 502，body 是 `{"detail": {"message": "...", "retryable": true|false}}`（见下面 Error handling）
 
 ### Frontend (`app/static/`)
 纯 HTML/CSS/JS，无构建步骤。双 tab：翻译 / 单词本。翻译结果中原句以可点击 token 渲染，AI 推荐词高亮；点击未高亮词触发 lookup popover。单词本每条卡片展示 `usages`：默认展开前 2 条，多出的收进「+N more」折叠按钮（`buildUsagesBlock`）。
@@ -81,7 +82,9 @@ Every `GeminiError` carries `retryable: bool` — true for transient overload (5
 ## Key Design Decisions
 
 - **google-genai SDK + Pydantic response_schema**：让 SDK 完成 JSON 校验，无需手动解析
-- **Python 3.11**：与本机环境一致
+- **Python 3.11+**：`pyproject.toml` 要求 `>=3.11`；本机开发用的是 3.12
 - **No ORM**：CRUD 简单，stdlib `sqlite3` 足够
-- **Tokenization in backend, not LLM**：分词是确定性的，没必要花 LLM token
+- **Tokenization in backend, not LLM**：分词/词组定位是确定性的，没必要花 LLM token
+- **Duplicate add = merge, not reject**：`db.upsert_vocab` 单事务内插入或追加用法，router 只把 `created` 映射成 201/200
+- **错误消息是固定的一小组，不透传原始异常**：Gemini/SDK 报错按结构化的 `status`/`code` 分类成几条可操作的中文提示 + `retryable` 标志，原始异常只进服务端日志
 - **Lookup cache on frontend**：同一个词二次点击不重复调 API
